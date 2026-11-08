@@ -1,0 +1,60 @@
+#
+#   VizieR Astronomical Server vizier.cds.unistra.fr
+#    Date: 2026-10-19T22:33:06 [V7.6.1]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	service_protocol=ASU	  IVOID of the protocol through which the data was retrieved
+#INFO	request_date=2026-10-19T22:33:06	  Query execution date
+#INFO	request=https://vizier.cds.unistra.fr/viz-bin/asu-tsv?-source=J%2FAJ%2F167%2F12%2Fcatalog&Cluster=NGC_2682&-out.all=&-out.max=10	  Full request URL
+#INFO	contact=cds-question@unistra.fr	  Email or URL to contact publisher
+#INFO	server_software=VizieR/7.6.1	  Software version
+#INFO	publisher=CDS	  Data centre that produced the VOTable
+
+#RESOURCE=yCat_51670012
+#Name: J/AJ/167/12
+#Title: Open cluster parameters with ANN (Cavallo+, 2024)
+#INFO	ivoid=ivo://cds.vizier/j/aj/167/12	    IVOID of underlying data collection
+#INFO	data_ivoid=ivo://cds.vizier/j/aj/167/12	    IVOID of underlying data collection
+#INFO	creator=Cavallo L.	    First author or institution
+#INFO	cites=bibcode:2024AJ....167...12C	    Article or Data origin sources
+#INFO	journal=AJ	    Journal name
+#INFO	original_date=2024	    Year of the article publication
+#INFO	reference_url=https://cdsarc.cds.unistra.fr/viz-bin/cat/J/AJ/167/12	    Dataset landing page
+#INFO	citation=doi:10.26093/cds/vizier/be-57-c	    Dataset identifier that can be used for citation
+#INFO	publication_date=2026-07-02	    Date of first publication in the data centre
+#INFO	rights_uri=https://cds.unistra.fr/vizier-org/licences_vizier.html	    Licence URI
+#Coosys	H_2016.000:	ICRS
+#Table	J_AJ_167_12_catalog:
+#Name: J/AJ/167/12/catalog
+#Title: Clusters analysed by our ANNs (update version, 18/10/2024)
+#Column	Cluster	(a20)	Cluster name	[ucd=meta.id;meta.main]
+#Column	RA_ICRS	(F15.11)	Mean right ascension (ICRS) at Ep=2016.0 of cluster's members	[ucd=pos.eq.ra;meta.main]
+#Column	DE_ICRS	(F15.11)	Mean declination (ICRS) at Ep=2016.0) of cluster's members	[ucd=pos.eq.dec;meta.main]
+#Column	kind	(A1)	[omg] Type of object from Hunt & Reffert (2023A&A...673A.114H, Cat. J/A+A/673/A114) (1)	[ucd=src.class]
+#Column	plx	(F6.3)	Mean parallax of cluster's members	[ucd=pos.parallax;stat.mean]
+#Column	e_plx	(F6.3)	Error on the parallax	[ucd=stat.error;pos.parallax]
+#Column	CMDclass	(F5.2)	[0/1] 50th percentile of CMD class from Hunt & Reffert (2023A&A...673A.114H, Cat. J/A+A/673/A114)	[ucd=meta.code]
+#Column	Quality	(I1)	[0/3] Quality of the predictions (2)	[ucd=meta.code.qual]
+#Column	logAge16	(F5.2)	16th percentile of logAge predictions of the ANNs	[ucd=time.age]
+#Column	logAge50	(F5.2)	50th percentile of logAge predictions of the ANNs	[ucd=time.age]
+#Column	logAge84	(F5.2)	84th percentile of logAge predictions of the ANNs	[ucd=time.age]
+#Column	[Fe/H]16	(F5.2)	16th percentile of [Fe/H] predictions of the ANNs	[ucd=phys.abund.Fe]
+#Column	[Fe/H]50	(F5.2)	50th percentile of [Fe/H] predictions of the ANNs	[ucd=phys.abund.Fe]
+#Column	[Fe/H]84	(F5.2)	84th percentile of [Fe/H] predictions of the ANNs	[ucd=phys.abund.Fe]
+#Column	AV16	(F5.2)	16th percentile of V-band extinction predictions of the ANNs	[ucd=phys.absorption]
+#Column	AV50	(F5.2)	50th percentile of V-band extinction predictions of the ANNs	[ucd=phys.absorption]
+#Column	AV84	(F5.2)	84th percentile of V-band extinction predictions of the ANNs	[ucd=phys.absorption]
+#Column	dMod16	(F5.2)	16th percentile of distance module predictions of the ANNs	[ucd=phot.mag.distMod]
+#Column	dMod50	(F5.2)	50th percentile of distance module predictions of the ANNs	[ucd=phot.mag.distMod]
+#Column	dMod84	(F5.2)	84th percentile of distance module predictions of the ANNs	[ucd=phot.mag.distMod]
+#Column	X	(F20.16)	X coordinate in galactocentric galactic coordinates (as predicted by the ANNs)	[ucd=pos.cartesian.x;pos.galactic;pos.galactocentric]
+#Column	Y	(D21.14)	Y coordinate in galactocentric galactic coordinates (as predicted by the ANNs)	[ucd=pos.cartesian.y;pos.galactic;pos.galactocentric]
+#Column	Z	(D21.14)	Z coordinate in galactocentric galactic coordinates (as predicted by the ANNs)	[ucd=pos.cartesian.z;pos.galactocentric;pos.galactic]
+#Column	Rgc	(F6.3)	Distance from Galactic centre (as predicted by the ANNs and assuming Sun Rgc=8.122kpc)	[ucd=pos.distance]
+Cluster	RA_ICRS	DE_ICRS	kind	plx	e_plx	CMDclass	Quality	logAge16	logAge50	logAge84	[Fe/H]16	[Fe/H]50	[Fe/H]84	AV16	AV50	AV84	dMod16	dMod50	dMod84	X	Y	Z	Rgc
+ 	deg	deg	 	mas	mas	 	 	[yr]	[yr]	[yr]	[-]	[-]	[-]	mag	mag	mag	mag	mag	mag	kpc	kpc	kpc	kpc
+--------------------	---------------	---------------	-	------	------	-----	-	-----	-----	-----	-----	-----	-----	-----	-----	-----	-----	-----	-----	--------------------	---------------------	---------------------	------
+NGC_2682            	132.83927710039	+11.82681930483	o	 1.151	 0.029	 0.98	0	 9.32	 9.40	 9.48	 0.19	 0.32	 0.44	 0.10	 0.18	 0.26	 9.50	 9.64	 9.80	 -0.5829950748767310	-4.19370018749052e-01	 4.91053852766714e-01	 8.715
+

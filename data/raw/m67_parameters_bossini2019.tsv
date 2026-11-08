@@ -1,0 +1,56 @@
+#
+#   VizieR Astronomical Server vizier.cds.unistra.fr
+#    Date: 2026-10-20T01:21:00 [V7.6.1]
+#   In case of problem, please report to:	cds-question@unistra.fr
+#
+#
+#Coosys	J2000:	eq_FK5 J2000
+#INFO	service_protocol=ASU	  IVOID of the protocol through which the data was retrieved
+#INFO	request_date=2026-10-20T01:21:00	  Query execution date
+#INFO	request=https://vizier.cds.unistra.fr/viz-bin/asu-tsv?-source=J%2FA%2BA%2F623%2FA108%2Ftablea&Cluster=NGC2682&-out.all=&-out.max=10	  Full request URL
+#INFO	contact=cds-question@unistra.fr	  Email or URL to contact publisher
+#INFO	server_software=VizieR/7.6.1	  Software version
+#INFO	publisher=CDS	  Data centre that produced the VOTable
+
+#RESOURCE=yCat_36230108
+#Name: J/A+A/623/A108
+#Title: Age of 269 GDR2 open clusters (Bossini+, 2019)
+#INFO	ivoid=ivo://cds.vizier/j/a+a/623/a108	    IVOID of underlying data collection
+#INFO	data_ivoid=ivo://cds.vizier/j/a+a/623/a108	    IVOID of underlying data collection
+#INFO	creator=Bossini D.	    First author or institution
+#INFO	cites=bibcode:2019A&A...623A.108B	    Article or Data origin sources
+#INFO	journal=A&A	    Journal name
+#INFO	original_date=2019	    Year of the article publication
+#INFO	reference_url=https://cdsarc.cds.unistra.fr/viz-bin/cat/J/A+A/623/A108	    Dataset landing page
+#INFO	citation=doi:10.26093/cds/vizier.36230108	    Dataset identifier that can be used for citation
+#INFO	publication_date=2021-01-22	    Date of first publication in the data centre
+#INFO	rights_uri=https://cds.unistra.fr/vizier-org/licences_vizier.html	    Licence URI
+#Coosys	H_2015.500:	ICRS
+#Table	J_A_A_623_A108_tablea:
+#Name: J/A+A/623/A108/tablea
+#Title: Summary of OCs parameters characterised in this study (tables A1-A3)
+#Column	Cluster	(a20)	Cluster name	[ucd=meta.id;meta.main]
+#Column	RA_ICRS	(F7.3)	Mean right ascension of the cluster (ICRS) at epoch 2015.5	[ucd=pos.eq.ra;meta.main]
+#Column	DE_ICRS	(F7.3)	Mean declination of the cluster (ICRS) at epoch 2015.5	[ucd=pos.eq.dec;meta.main]
+#Column	logA	(F10.3)	Bayesian estimation of Age (in log t)	[ucd=time.age]
+#Column	e_logA	(F10.3)	16th percentile confidence level of Age (in log t)	[ucd=stat.error]
+#Column	E_logA	(F10.3)	84th percentile confidence level of Age (in log t)	[ucd=stat.error;stat.max]
+#Column	Dist	(F10.3)	Bayesian estimation of distant modulus	[ucd=phot.mag.distMod]
+#Column	e_Dist	(F10.3)	16th percentile confidence level of distance modulus	[ucd=stat.error]
+#Column	E_Dist	(F10.3)	84th percentile confidence level of distance modulus	[ucd=stat.error;stat.max]
+#Column	AV	(F10.3)	Bayesian estimation of extinction in V band	[ucd=phys.absorption]
+#Column	e_AV	(F10.3)	16th percentile confidence level of extinction in V band	[ucd=stat.error]
+#Column	E_AV	(F10.3)	84th percentile confidence level of extinction in V band	[ucd=stat.error;stat.max]
+#Column	AGTO	(F10.3)	Extinction in G band (GaiaDR2 Evans et al., 2018A&A...616A...4E, Cat. I/345) at the turn off of the cluster	[ucd=phys.absorption;em.opt.V]
+#Column	e_AGTO	(F10.3)	16th percentile confidence level of extinction in G band at the turn off	[ucd=stat.error]
+#Column	E_AGTO	(F10.3)	84th percentile confidence level of extinction in G band at the turn off	[ucd=stat.error;stat.max]
+#Column	Fe/H	(F10.3)	Cluster metallicity assumed (in dex)	[ucd=phys.abund.Z]
+#Column	r_Fe/H	(A10)	Reference for the metallicity assumed (1)	[ucd=meta.ref]
+#Column	SimbadName	(a22)	Simbad column added by the CDS	[ucd=meta.id]
+#Column	_RA.icrs	(F8.4)	Right ascension (ICRS) at Epoch=J2015.5 (computed by VizieR, not part of the original data. The format may include more digits than the original data because of internal accuracy requirements in VizieR and across other CDS services)	[ucd=pos.eq.ra]
+#Column	_DE.icrs	(F8.4)	Declination (ICRS) at Epoch=J2015.5 (computed by VizieR, not part of the original data. The format may include more digits than the original data because of internal accuracy requirements in VizieR and across other CDS services)	[ucd=pos.eq.dec]
+Cluster	RA_ICRS	DE_ICRS	logA	e_logA	E_logA	Dist	e_Dist	E_Dist	AV	e_AV	E_AV	AGTO	e_AGTO	E_AGTO	Fe/H	r_Fe/H	SimbadName	_RA.icrs	_DE.icrs
+ 	deg	deg	[yr]	[yr]	[yr]	mag	mag	mag	mag	mag	mag	mag	mag	mag	 	 	 	deg	deg
+--------------------	-------	-------	----------	----------	----------	----------	----------	----------	----------	----------	----------	----------	----------	----------	----------	----------	----------------------	--------	--------
+NGC2682             	132.846	+11.814	     9.561	     9.563	     9.559	     9.726	     9.726	     9.726	     0.115	     0.115	     0.115	     0.112	     0.112	     0.112	     0.000	       HRS	NGC2682               	132.8460	+11.8140
+
