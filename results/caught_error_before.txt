@@ -1,0 +1,49 @@
+..FF...                                                                [100%]
+=================================== FAILURES ===================================
+________________ TestM67Residuals.test_known_shift_is_recovered ________________
+
+self = <test_m67_residuals.TestM67Residuals testMethod=test_known_shift_is_recovered>
+
+    @settings(max_examples=64, derandomize=True, database=None, deadline=None,
+>             report_multiple_bugs=False)
+               ^^^^^^^
+
+checks/test_m67_residuals.py:39: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../Downloads/week_6/artefacts/.venv-w6/lib/python3.12/site-packages/hypothesis/core.py:1730: in _raise_to_user
+    raise the_error_hypothesis_found
+checks/test_m67_residuals.py:49: in test_known_shift_is_recovered
+    self.assert_mag(actual, shift, f"G={float(g):.3f}")
+checks/test_m67_residuals.py:22: in assert_mag
+    self.assertLessEqual(
+E   AssertionError: Fraction(1, 10) not less than or equal to Fraction(1, 100000000) : G=16.500: получено -0.050000000, ожидалось +0.050000000 mag
+E   Failing explicit example: test_known_shift_is_recovered(
+E       self=<test_m67_residuals.TestM67Residuals testMethod=test_known_shift_is_recovered>,
+E       g_milli=16500,
+E       shift_centi=5,
+E   )
+______________ TestM67Residuals.test_one_star_against_two_curves _______________
+
+self = <test_m67_residuals.TestM67Residuals testMethod=test_one_star_against_two_curves>
+
+    def test_one_star_against_two_curves(self):
+        """Та же звезда между двумя кривыми: знак должен поменяться."""
+        g, observed = F("16.50"), F("1.05")
+        model_a = branch(STRAIGHT)
+        # Вторую кривую задаём в обратном порядке G и с изломом у G=17.
+        model_b = branch(((18, "1.40", 1), (17, "1.30", 1),
+                          (16, "0.90", 1), (15, "0.70", 1)))
+        # По узлам при 16 и 17: цвет A посередине = 1.00, цвет B = 1.10.
+>       self.assert_mag(colour_residual(g, observed, model_a), F("+0.05"), "кривая A")
+
+checks/test_m67_residuals.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+checks/test_m67_residuals.py:22: in assert_mag
+    self.assertLessEqual(
+E   AssertionError: Fraction(1, 10) not less than or equal to Fraction(1, 100000000) : кривая A: получено -0.050000000, ожидалось +0.050000000 mag
+=========================== short test summary info ============================
+FAILED checks/test_m67_residuals.py::TestM67Residuals::test_known_shift_is_recovered
+FAILED checks/test_m67_residuals.py::TestM67Residuals::test_one_star_against_two_curves
+2 failed, 5 passed, 2 subtests passed in 0.13s
+
+Код pytest: 1
