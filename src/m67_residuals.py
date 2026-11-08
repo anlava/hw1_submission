@@ -1,7 +1,8 @@
-"""M67: этапы dry, smoke и sweep из METHOD.md."""
+"""M67: dry, smoke, sweep, оценка времени (budget) и сравнение на наблюдениях (full)."""
 
 import argparse
 import csv
+import json
 import subprocess
 import sys
 from datetime import datetime
@@ -9,9 +10,10 @@ from decimal import Decimal, InvalidOperation
 from fractions import Fraction
 from importlib import metadata
 from itertools import pairwise
-from math import isfinite
+from math import isfinite, log
 from pathlib import Path
 from random import Random
+from tempfile import NamedTemporaryFile
 from time import perf_counter
 
 
@@ -22,6 +24,8 @@ MODELS = {
 }
 BINS = ("[15,16)", "[16,17)", "[17,18]")
 MIN_N = 20
+BOOT_SEEDS = (11, 23, 37)
+BOOT_DRAWS = 2000  # на один seed в одном интервале G
 TOL = Fraction(1, 10**8)  # Абсолютный допуск для контрольного сдвига, mag.
 LABEL_SOURCE = "https://stev.oapd.inaf.it/cmd_3.9/help.html"  # 1=MS (main sequence)
 LOG_FIELDS = ("timestamp", "stage", "shift", "seed", "n", "metric", "elapsed_s",
@@ -61,19 +65,26 @@ def bin_index(g):
     return None
 
 
-def member_counts(path):
-    counts = [0, 0, 0]
+def observation_bins(path):
+    """Общие строки для обеих моделей: один GaiaDR3, одна G, один наблюдаемый цвет."""
+    groups = [[] for _ in BINS]
     seen = set()
     for where, row in records(path, ("GaiaDR3", "Gmag", "BP_RP")):
         key = row["GaiaDR3"]
         if not (key.isascii() and key.isdigit()) or key in seen:
             raise ValueError(f"{where}: GaiaDR3 пуст, некорректен или повторён: {key!r}")
         seen.add(key)
-        i = bin_index(number(row["Gmag"], f"{where} Gmag"))
-        number(row["BP_RP"], f"{where} BP_RP")
+        g = number(row["Gmag"], f"{where} Gmag")
+        colour = number(row["BP_RP"], f"{where} BP_RP")
+        i = bin_index(g)
         if i is not None:
-            counts[i] += 1
-    return len(seen), counts
+            groups[i].append((key, g, colour))
+    return len(seen), groups
+
+
+def member_counts(path):
+    total, groups = observation_bins(path)
+    return total, [len(group) for group in groups]
 
 
 def model_points(path):
@@ -334,8 +345,279 @@ def sweep(root):
     return 0 if ok else 1
 
 
+def validated_inputs(root):
+    """Общая подготовка для budget и full; без вычисления остатков."""
+    results = root / "results"
+    cmd = [sys.executable, "-B", str(root / "checks" / "check_comparison.py")]
+    code = subprocess.run(cmd, cwd=root, check=False).returncode
+    if code:
+        raise ValueError(f"checks/check_comparison.py: код {code}")
+    _, groups = observation_bins(results / "m67_members_selected.csv")
+    curves = {}
+    for name, filename in MODELS.items():
+        try:
+            curves[name] = check_coverage(model_points(results / filename))
+        except ValueError as exc:
+            raise ValueError(f"{name}: {exc}") from exc
+    return groups, curves
+
+
+def paired_interval(abs_c, abs_b):
+    """Интервал для разности медиан |r|. Элементы с одним индексом — одна звезда."""
+    import numpy as np
+
+    abs_c = np.asarray(abs_c, dtype=float)
+    abs_b = np.asarray(abs_b, dtype=float)
+    if abs_c.ndim != 1 or not abs_c.size or abs_c.shape != abs_b.shape:
+        raise ValueError("для парного бутстрэпа нужны две непустые колонки одной длины")
+    if (not np.isfinite(abs_c).all() or not np.isfinite(abs_b).all()
+            or np.any(abs_c < 0) or np.any(abs_b < 0)):
+        raise ValueError("в колонки |r| можно передать только конечные неотрицательные значения")
+    n = abs_c.size
+    samples = np.empty((len(BOOT_SEEDS), BOOT_DRAWS), dtype=float)
+    for j, seed in enumerate(BOOT_SEEDS):
+        rng = np.random.default_rng(seed)
+        for start in range(0, BOOT_DRAWS, 128):
+            stop = min(start + 128, BOOT_DRAWS)
+            idx = rng.integers(0, n, size=(stop - start, n))
+            samples[j, start:stop] = (np.median(abs_c[idx], axis=1)
+                                      - np.median(abs_b[idx], axis=1))
+    tail = 0.05 / (2 * len(BINS))
+    low, high = np.quantile(samples.ravel(), [tail, 1 - tail], method="linear")
+    return float(low), float(high)
+
+
+def summarise_bin(stars, curves):
+    """Единая операция для замера и полного расчёта: остатки, медианы и интервал D."""
+    import numpy as np
+
+    n = len(stars)
+    if n < MIN_N:
+        return {"n": n, "status": "недостаточно данных"}
+    cav = np.empty(n, dtype=float)
+    bos = np.empty(n, dtype=float)
+    for j, (_, g, colour) in enumerate(stars):
+        cav[j] = float(colour_residual(g, colour, curves["Cavallo"]))
+        bos[j] = float(colour_residual(g, colour, curves["Bossini"]))
+    if not np.isfinite(cav).all() or not np.isfinite(bos).all():
+        raise ValueError("неконечный остаток в паре моделей")
+    abs_c, abs_b = np.abs(cav), np.abs(bos)
+    med_c, med_b = float(np.median(abs_c)), float(np.median(abs_b))
+    low, high = paired_interval(abs_c, abs_b)
+    return dict(n=n, status="рассчитано", median_r_cav=float(np.median(cav)),
+                median_r_bos=float(np.median(bos)), median_abs_r_cav=med_c,
+                median_abs_r_bos=med_b, D=med_c - med_b, ci_low=low, ci_high=high)
+
+
+def budget_stars(counts):
+    """Искусственные звёзды для таймера. Никакой наблюдаемой фотометрии на входе."""
+    rng = Random(6706)
+    groups = []
+    for lo, n in zip((15, 16, 17), counts):
+        group = []
+        for j in range(n):
+            g = lo + Fraction(rng.randrange(1, 10**12), 10**12)
+            colour = reference_colour(g) + Fraction(rng.randrange(-1500, 1501), 10000)
+            group.append((f"synthetic-{lo}-{j}", g, colour))
+        groups.append(group)
+    return groups
+
+
+def budget(root):
+    """Два замера масштаба. Для каждого размера — все три интервала и все три seed."""
+    try:
+        versions = environment()
+        if sys.version_info < (3, 11) or "не установлен" in versions.values():
+            raise ValueError("по METHOD.md нужен Python 3.11+ с NumPy, pytest и Hypothesis")
+        import numpy as np  # импорт и запуск интерпретатора вне таймера
+
+        t0 = perf_counter()
+        real_groups, curves = validated_inputs(root)
+        counts = tuple(map(len, real_groups))
+        t_setup = perf_counter() - t0
+        del real_groups  # дальше используются только количества по G и две модельные кривые
+        # Для маленькой и большой выборок сохраняем те же три интервала и ветку n >= 20.
+        sizes = [tuple(n if n < MIN_N else max(MIN_N, (n + d // 2) // d)
+                       for n in counts) for d in (4, 2)]
+        n1, n2 = map(sum, sizes)
+        target = sum(counts)
+        if not 0 < n1 < n2 < target:
+            raise ValueError(f"два размера для оценки масштаба не различимы: {n1}, {n2}, {target}")
+        large = budget_stars(sizes[1])
+        small = [group[:n] for group, n in zip(large, sizes[0])]
+        inputs = [small, large]
+        for group in small:  # прогрев той же функции; синтетика и прогрев не входят в замеры
+            summarise_bin(group, curves)
+        times = [[], []]
+        seeds = "/".join(map(str, BOOT_SEEDS))
+        repeats = 5
+        journal = root / "results" / "week6_runs.csv"
+        for iteration in range(repeats):
+            for k in ((0, 1) if iteration % 2 == 0 else (1, 0)):
+                stamp = datetime.now().astimezone().isoformat(timespec="seconds")
+                t0 = perf_counter()
+                for group in inputs[k]:
+                    summarise_bin(group, curves)
+                dt = perf_counter() - t0
+                if not isfinite(dt) or dt <= 0:
+                    raise ValueError("не удалось измерить положительное время")
+                times[k].append(dt)
+                append_log(journal, dict(timestamp=stamp, stage="budget", seed=seeds,
+                           n=sum(sizes[k]), elapsed_s=f"{dt:.9f}", verdict="PASS",
+                           detail=f"синтетика seed=6706; G: {sizes[k]}; замер {iteration+1}/{repeats}; "
+                                  f"B={BOOT_DRAWS} на каждый bootstrap seed и интервал", **versions))
+        t1, t2 = (float(np.median(v)) for v in times)
+        kappa = log(t2 / t1) / log(n2 / n1)
+        predicted = t2 * (target / n2) ** kappa
+        total = t_setup + predicted
+        print(f"Подготовка (проверка CSV, чтение и построение ветвей): {t_setup:.6f} с")
+        for ns, ts, mid in zip(sizes, times, (t1, t2)):
+            print(f"N={sum(ns)}, по G={ns}: медиана {mid:.6f} с "
+                  f"({len(ts)} замеров, от {min(ts):.6f} до {max(ts):.6f} с)")
+        print(f"κ = {kappa:.3f}")
+        if t2 <= t1:
+            print("На большем размере медиана времени не выросла; "
+                  "по таким замерам показатель роста ненадёжен.")
+        elif min(times[1]) <= max(times[0]):
+            print("Диапазоны замеров перекрылись; показатель роста может быть чувствителен к шуму.")
+        print(f"Прогноз для N={target}, по G={counts}: счёт ≈ {predicted:.6f} с; "
+              f"с подготовкой ≈ {total:.6f} с.")
+        append_log(journal, dict(timestamp=datetime.now().astimezone().isoformat(timespec="seconds"),
+                   stage="budget_forecast", seed=seeds, n=target, metric=f"{total:.9f}",
+                   verdict="PASS", detail=f"прогноз в с; подготовка={t_setup:.9f}; "
+                   f"N1={n1}, T1={t1:.9f}; N2={n2}, T2={t2:.9f}; κ={kappa:.6f}; "
+                   f"счёт={predicted:.9f}; без запуска Python, импорта и записи итоговой таблицы", **versions))
+        print("budget: ПРИНЯТО. Времена записаны в results/week6_runs.csv.")
+        return 0
+    except (OSError, ImportError, ValueError, ArithmeticError, csv.Error) as exc:
+        print(f"budget: НЕ ПРИНЯТО; {exc}")
+        return 1
+
+
+SCIENCE_FIELDS = ("g_bin", "n", "median_r_cav", "median_r_bos", "median_abs_r_cav",
+                  "median_abs_r_bos", "D", "ci_low", "ci_high", "status")
+
+
+def result_row(g_bin, summary):
+    row = {"g_bin": g_bin, **summary}
+    if row["n"] < MIN_N:
+        return row  # численные поля в CSV останутся пустыми
+    lo, hi = row["ci_low"], row["ci_high"]
+    if not all(isfinite(row[k]) for k in SCIENCE_FIELDS[2:-1]) or hi < lo:
+        raise ValueError(f"{g_bin}: некорректная статистика или границы интервала")
+    if lo <= 0 <= hi:
+        row["status"] = "устойчивого различия не обнаружено"
+    else:
+        row["status"] = "интервал D выше нуля" if lo > 0 else "интервал D ниже нуля"
+    return row
+
+
+def last_forecast(path, n, versions):
+    """Последний прогноз для этого N, набора seed и версий Python/NumPy, если он есть."""
+    latest = None
+    if path.exists() and path.stat().st_size:
+        with path.open(encoding="utf-8", newline="") as stream:
+            reader = csv.DictReader(stream, strict=True)
+            if reader.fieldnames != list(LOG_FIELDS):
+                raise ValueError(f"{path.name}: несовместимый заголовок журнала")
+            for row in reader:
+                if (row["stage"] == "budget_forecast" and row["verdict"] == "PASS"
+                        and row["n"] == str(n) and row["seed"] == "/".join(map(str, BOOT_SEEDS))
+                        and all(row[k] == versions[k] for k in ("python", "numpy"))):
+                    try:
+                        latest = float(row["metric"])
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"{path.name}:{reader.line_num}: неверное время прогноза") from exc
+                    if not isfinite(latest) or latest <= 0:
+                        raise ValueError(f"{path.name}:{reader.line_num}: неверное время прогноза")
+    return latest
+
+
+def write_science_csv(path, rows):
+    """Заменяем результат только после записи всех трёх строк во временный файл."""
+    tmp = None
+    try:
+        with NamedTemporaryFile("w", encoding="utf-8", newline="", dir=path.parent,
+                                prefix=".m67_full_", suffix=".tmp", delete=False) as stream:
+            tmp = Path(stream.name)
+            writer = csv.DictWriter(stream, SCIENCE_FIELDS)
+            writer.writeheader()
+            writer.writerows(rows)
+        tmp.replace(path)
+    finally:
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
+
+
+def full(root):
+    results = root / "results"
+    journal = results / "week6_runs.csv"
+    output = results / "m67_residuals_by_g.csv"
+    versions = environment()
+    record = dict(timestamp=datetime.now().astimezone().isoformat(timespec="seconds"),
+                  stage="full", seed="/".join(map(str, BOOT_SEEDS)), verdict="FAIL", **versions)
+    try:
+        if sys.version_info < (3, 11) or "не установлен" in versions.values():
+            raise ValueError("по METHOD.md нужен Python 3.11+ с NumPy, pytest и Hypothesis")
+        import numpy  # загрузка до таймера, как в budget
+
+        tick = perf_counter()
+        groups, curves = validated_inputs(root)
+        counts = tuple(map(len, groups))
+        prep = perf_counter() - tick
+        record["n"] = sum(counts)
+        tick = perf_counter()
+        summaries = [summarise_bin(group, curves) for group in groups]
+        calc = perf_counter() - tick
+        elapsed = prep + calc
+        record["elapsed_s"] = f"{elapsed:.9f}"
+        rows = [result_row(name, s) for name, s in zip(BINS, summaries, strict=True)]
+        prediction = last_forecast(journal, record["n"], versions)
+        timing = f"подготовка {prep:.6f} с; счёт {calc:.6f} с; всего {elapsed:.6f} с"
+        if prediction is not None:
+            comparison = (f"Прогноз {prediction:.6f} с; факт − прогноз {elapsed-prediction:+.6f} с "
+                          f"({100*(elapsed/prediction-1):+.1f}%).")
+        else:
+            comparison = "Сопоставимый прогноз в журнале не найден."
+        record["metric"] = json.dumps({r["g_bin"]: r.get("D") for r in rows},
+                                      allow_nan=False, ensure_ascii=False, separators=(",", ":"))
+        record["detail"] = (f"D в mag по интервалам; n={counts}; B={BOOT_DRAWS} на seed; "
+                            f"results/{output.name}; {timing}. {comparison}")
+        write_science_csv(output, rows)
+        record["verdict"] = "PASS"
+    except (ImportError, OSError, ValueError, ArithmeticError, csv.Error) as exc:
+        record["detail"] = str(exc)
+    try:
+        append_log(journal, record)
+    except (OSError, ValueError, csv.Error) as exc:
+        published = "новая CSV записана" if record["verdict"] == "PASS" else "новой CSV нет"
+        print(f"full: НЕ ПРИНЯТО; {published}; {record['detail']}; ошибка журнала: {exc}")
+        return 1
+    if record["verdict"] != "PASS":
+        print(f"full: НЕ ПРИНЯТО; результат за этот запуск не записан: {record['detail']}")
+        return 1
+
+    print("G          n    med r_Cav    med r_Bos   med|r|_Cav   med|r|_Bos"
+          "           D     интервал D (всё в mag)")
+    for row in rows:
+        left = f"{row['g_bin']:<8} {row['n']:3d}"
+        if row["n"] < MIN_N:
+            print(f"{left}  {row['status']}")
+        else:
+            print(f"{left}  {row['median_r_cav']:+.6f}     {row['median_r_bos']:+.6f}     "
+                  f"{row['median_abs_r_cav']:.6f}     {row['median_abs_r_bos']:.6f}   "
+                  f"{row['D']:+.6f}   [{row['ci_low']:+.6f}; {row['ci_high']:+.6f}]"
+                  f"  {row['status']}")
+    print("D = med|r_Cav| − med|r_Bos|. Парный процентильный интервал: "
+          "α=0.05 с поправкой на три интервала G.")
+    print(f"Факт: {timing}. {comparison}")
+    print(f"full: ПРИНЯТО; results/{output.name}; журнал: results/week6_runs.csv.")
+    return 0
+
+
 if __name__ == "__main__":
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument("stage", choices=("dry", "smoke", "sweep"))
+    runners = {"dry": dry, "smoke": smoke, "sweep": sweep, "budget": budget, "full": full}
+    cli.add_argument("stage", choices=tuple(runners))
     stage = cli.parse_args().stage
-    raise SystemExit({"dry": dry, "smoke": smoke, "sweep": sweep}[stage](ROOT))
+    raise SystemExit(runners[stage](ROOT))
